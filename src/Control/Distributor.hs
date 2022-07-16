@@ -43,36 +43,51 @@ class Bimodule p => Distributor p where
   (>|<) :: p a0 b0 -> p a1 b1 -> p (Either a0 a1) (Either b0 b1)
   (>|<) = branch id id
 
-data Dist q a b where
-  Expel :: b -> Dist q a b
+data Bimod q a b where
+  Expel :: b -> Bimod q a b
   Factor
     :: (a -> (a0, a1))
     -> (b0 -> b1 -> b)
-    -> Dist q a0 b0
-    -> Dist q a1 b1
-    -> Dist q a b
+    -> q a0 b0
+    -> Bimod q a1 b1
+    -> Bimod q a b
+instance Profunctor (Bimod q) where
+  dimap f g = \case
+    Expel b -> Expel (g b)
+    Factor f' g' q0 d1 ->
+      Factor (f' . f) (((.).(.)) g g') q0 d1
+-- instance Bimodule (Bimod q) where
+--   expel = Expel
+--   factor f g d0 = \case
+--     Expel b -> Expel (g _ b)
+--     Factor f' g' q0 d1 -> _
+
+data Dist q a b where
   Root :: (a -> Void) -> Dist q a b
   Branch
     :: (a -> Either a0 a1)
     -> (Either b0 b1 -> b)
-    -> Dist q a0 b0
+    -> Bimod q a0 b0
     -> Dist q a1 b1
     -> Dist q a b
-instance Profunctor (Dist q) where
-  dimap f g = \case
-    Expel b -> Expel (g b)
-    Factor f' g' d1 d2 ->
-      Factor (f' . f) (((.).(.)) g g') d1 d2
-    Root f' -> Root (f' . f)
-    Branch f' g' d1 d2 ->
-      Branch (f' . f) (g . g') d1 d2
-instance Bimodule (Dist q) where
-  expel = Expel
-  factor = Factor
-instance Distributor (Dist q) where
-  root = Root
-  branch = Branch
+-- instance Profunctor (Dist q) where
+--   dimap f g = \case
+--     Expel b -> Expel (g b)
+--     Factor f' g' q0 d1 ->
+--       Factor (f' . f) (((.).(.)) g g') q0 d1
+--     Root f' -> Root (f' . f)
+--     Branch f' g' q0 d1 ->
+--       Branch (f' . f) (g . g') q0 d1
+-- instance Bimodule (Dist q) where
+--   expelled = Expel ()
+--   d0 >*< d1 = _
+--  factor f g q0 = \case
+--    Expel b -> Factor f g (Expel b)
+    
+-- instance Distributor (Dist q) where
+--   root = Root
+--   branch = Branch
 
-class (forall q. Distributor (dist q))
-  => FreeDistributor dist where
-instance FreeDistributor Dist
+-- class (forall q. Distributor (dist q))
+--   => FreeDistributor dist where
+-- instance FreeDistributor Dist
