@@ -10,21 +10,6 @@ import Control.Arrow
 import Data.Profunctor
 import Data.Void
 
-{- The name `Bimodule` in the category theory literature
-is a synonym for `Profunctor`. Here it is restricted
-to the case of a Hask-enriched endo-profunctor which respects
-the product structure of Hask given by pairing `(,)`.
-`Bimodule` and `Profunctor` relate in the same way as
-`Applicative` and `Functor`.
-
-I might guess that there's a Van Laarhoven representation
-of `Traversal`s using `Bimodule`.
-
-```
-type Traversal s t a b =
-  forall p. Bimodule p => p a b -> p s t
-```
--}
 class Profunctor p => Bimodule p where
 
   expel :: b -> p a b
@@ -92,13 +77,16 @@ data Dist q a b where
     -> Dist q a1 b1
     -> Dist q a b
 
+liftBimod :: Bimod q a b -> Dist q a b
+liftBimod x = Branch Left (either id absurd) x (Root id)
+
 instance Profunctor (Dist q) where
   dimap f g = \case
     Root a -> Root (a . f)
     Branch f' g' bim dist -> Branch (f' . f) (g . g') bim dist
 
 instance Bimodule (Dist q) where
-  expel b = Branch Left (either id absurd) (Expel b) (Root id)
+  expel b = liftBimod (Expel b)
   factor f _ (Root v) _ = Root (v . fst . f)
   factor f g (Branch f' g' x y) z =
     let
@@ -115,7 +103,7 @@ instance Bimodule (Dist q) where
       branch
         (distribute . ff)
         (gg . redistribute)
-        (Branch Left (either id absurd) x (Root id) >*< z)
+        (liftBimod x >*< z)
         (y >*< z)
 
 instance Distributor (Dist q) where
@@ -130,8 +118,8 @@ instance Distributor (Dist q) where
 
       ff = left f' . f
 
-      gg (Left b2) = g (Left (g' (Left b2)))
-      gg (Right (Left b3)) = g (Left (g' (Right b3)))
-      gg (Right (Right b1)) = g (Right b1)
+      gg (Left b0) = g (Left (g' (Left b0)))
+      gg (Right (Left b1)) = g (Left (g' (Right b1)))
+      gg (Right (Right b2)) = g (Right b2)
     in
       Branch (associate . ff) gg x (y >|< z)
