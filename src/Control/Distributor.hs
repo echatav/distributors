@@ -93,14 +93,10 @@ data Dist q a b where
     -> Bimod q a0 b0
     -> Dist q a1 b1
     -> Dist q a b
--- instance Profunctor (Dist q) where
---   dimap f g = \case
---     Expel b -> Expel (g b)
---     Factor f' g' q0 d1 ->
---       Factor (f' . f) (((.).(.)) g g') q0 d1
---     Root f' -> Root (f' . f)
---     Branch f' g' q0 d1 ->
---       Branch (f' . f) (g . g') q0 d1
+instance Profunctor (Dist q) where
+  dimap f g = \case
+    Root a -> Root (a . f)
+    Branch f' g' bim dist -> Branch (f' . f) (g . g') bim dist
 -- instance Bimodule (Dist q) where
 --   expelled = Expel ()
 --   d0 >*< d1 = _
