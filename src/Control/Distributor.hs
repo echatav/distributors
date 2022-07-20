@@ -9,6 +9,13 @@ module Control.Distributor where
 import Data.Profunctor
 import Data.Void
 
+{- The name `Bimodule` in the category theory literature
+is a synonym for `Profunctor`. Here it is restricted
+to the case of a Hask-enriched endo-profunctor which respects
+the product structure of Hask given by pairing `(,)`.
+`Bimodule` and `Profunctor` relate in the same way as
+`Applicative` and `Functor`.
+-}
 class Profunctor p => Bimodule p where
 
   expel :: b -> p a b
