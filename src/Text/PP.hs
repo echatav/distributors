@@ -12,7 +12,7 @@ data PP s a b = PP
   }
 instance Profunctor (PP s) where
   dimap f g pp = PP (printer pp . f) (map (first g) . parser pp)
-instance Monoid s => Bimodule (PP s) where
+instance Bimodule (PP s) where
   expel b = PP (\_ -> Just) (\s -> [(b,s)])
   factor f g pp0 pp1 = PP printer' parser'
     where
@@ -24,7 +24,7 @@ instance Monoid s => Bimodule (PP s) where
         (b0, s0) <- parser pp0 s
         (b1, s1) <- first (g b0) <$> parser pp1 s0
         return (b1, s1)
-instance Monoid s => Distributor (PP s) where
+instance Distributor (PP s) where
   root f = PP (\_ _ -> Nothing) (\_ -> [])
   branch f g pp0 pp1 = PP printer' parser'
     where
