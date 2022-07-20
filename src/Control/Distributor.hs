@@ -77,13 +77,11 @@ instance Bimodule (Bimod q) where
   factor f g (Expel b) bim = dimap (snd . f) (g b) bim
   factor f g (Factor f' g' q bim0) bim1 =
     let
-      assoc ((a,b),c) = (a,(b,c))
+      associate ((a,b),c) = (a,(b,c))
+      ff = first f' . f
+      gg b0 (b1,b2) = g (g' b0 b1) b2
     in
-      Factor
-        (assoc . first f' . f)
-        (\b0 (b1,b2) -> g (g' b0 b1) b2)
-        q
-        (bim0 >*< bim1)
+      Factor (associate . ff) gg q (bim0 >*< bim1)
 
 data Dist q a b where
   Root :: (a -> Void) -> Dist q a b
@@ -93,20 +91,47 @@ data Dist q a b where
     -> Bimod q a0 b0
     -> Dist q a1 b1
     -> Dist q a b
+
 instance Profunctor (Dist q) where
   dimap f g = \case
     Root a -> Root (a . f)
     Branch f' g' bim dist -> Branch (f' . f) (g . g') bim dist
--- instance Bimodule (Dist q) where
---   expelled = Expel ()
---   d0 >*< d1 = _
---  factor f g q0 = \case
---    Expel b -> Factor f g (Expel b)
-    
--- instance Distributor (Dist q) where
---   root = Root
---   branch = Branch
 
--- class (forall q. Distributor (dist q))
---   => FreeDistributor dist where
--- instance FreeDistributor Dist
+instance Bimodule (Dist q) where
+  expel b = Branch Left (either id absurd) (Expel b) (Root id)
+  factor f _ (Root v) _ = Root (v . fst . f)
+  factor f g (Branch f' g' x y) z =
+    let
+      distribute (Left a,c) = Left (a,c)
+      distribute (Right b,c) = Right (b,c)
+
+      redistribute (Left (a,c)) = (Left a,c)
+      redistribute (Right (b,c)) = (Right b,c)
+
+      ff = first f' . f
+
+      gg (a,b) = g (g' a) b
+    in
+      branch
+        (distribute . ff)
+        (gg . redistribute)
+        (Branch Left (either id absurd) x (Root id) >*< z)
+        (y >*< z)
+
+instance Distributor (Dist q) where
+  root = Root
+  branch f g (Root v) dist =
+    dimap (either (absurd . v) id . f) (g . Right) dist
+  branch f g (Branch f' g' x y) z =
+    let
+      associate (Left (Left a)) = Left a
+      associate (Left (Right b)) = Right (Left b)
+      associate (Right  c) = Right (Right c)
+
+      ff = left f' . f
+
+      gg (Left b2) = g (Left (g' (Left b2)))
+      gg (Right (Left b3)) = g (Left (g' (Right b3)))
+      gg (Right (Right b1)) = g (Right b1)
+    in
+      Branch (associate . ff) gg x (y >|< z)
