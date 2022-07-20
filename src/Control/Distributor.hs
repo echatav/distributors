@@ -6,6 +6,7 @@ GADTs
 
 module Control.Distributor where
 
+import Control.Arrow
 import Data.Profunctor
 import Data.Void
 
@@ -71,11 +72,18 @@ instance Profunctor (Bimod q) where
     Expel b -> Expel (g b)
     Factor f' g' q0 d1 ->
       Factor (f' . f) (((.).(.)) g g') q0 d1
--- instance Bimodule (Bimod q) where
---   expel = Expel
---   factor f g d0 = \case
---     Expel b -> Expel (g _ b)
---     Factor f' g' q0 d1 -> _
+instance Bimodule (Bimod q) where
+  expel = Expel
+  factor f g (Expel b) bim = dimap (snd . f) (g b) bim
+  factor f g (Factor f' g' q bim0) bim1 =
+    let
+      assoc ((a,b),c) = (a,(b,c))
+    in
+      Factor
+        (assoc . first f' . f)
+        (\b0 (b1,b2) -> g (g' b0 b1) b2)
+        q
+        (bim0 >*< bim1)
 
 data Dist q a b where
   Root :: (a -> Void) -> Dist q a b
