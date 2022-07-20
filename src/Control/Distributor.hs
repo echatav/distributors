@@ -16,7 +16,7 @@ class Profunctor p => Bimodule p where
   expel b = dimap (\_ -> ()) (\_ -> b) expelled
   expelled :: p () ()
   expelled = expel ()
-  
+
   factor
     :: (a -> (a0, a1))
     -> (b0 -> b1 -> b)
@@ -55,18 +55,20 @@ data Bimod q a b where
 instance Profunctor (Bimod q) where
   dimap f g = \case
     Expel b -> Expel (g b)
-    Factor f' g' q0 d1 ->
-      Factor (f' . f) (((.).(.)) g g') q0 d1
+    Factor f' g' x y ->
+      Factor (f' . f) (((.).(.)) g g') x y
 instance Bimodule (Bimod q) where
   expel = Expel
-  factor f g (Expel b) bim = dimap (snd . f) (g b) bim
-  factor f g (Factor f' g' q bim0) bim1 =
+  -- 1*x = x
+  factor f g (Expel b) x = dimap (snd . f) (g b) x
+  -- (x*y)*z = x*(y*z)
+  factor f g (Factor f' g' x y) z =
     let
       associate ((a,b),c) = (a,(b,c))
       ff = first f' . f
       gg b0 (b1,b2) = g (g' b0 b1) b2
     in
-      Factor (associate . ff) gg q (bim0 >*< bim1)
+      Factor (associate . ff) gg x (y >*< z)
 
 data Dist q a b where
   Root :: (a -> Void) -> Dist q a b
@@ -82,12 +84,14 @@ liftBimod x = Branch Left (either id absurd) x (Root id)
 
 instance Profunctor (Dist q) where
   dimap f g = \case
-    Root a -> Root (a . f)
-    Branch f' g' bim dist -> Branch (f' . f) (g . g') bim dist
+    Root v -> Root (v . f)
+    Branch f' g' x y -> Branch (f' . f) (g . g') x y
 
 instance Bimodule (Dist q) where
   expel b = liftBimod (Expel b)
+  -- 0 * _ = 0
   factor f _ (Root v) _ = Root (v . fst . f)
+  -- (x+y)*z = (x*z)+(y*z)
   factor f g (Branch f' g' x y) z =
     let
       distribute (Left a,c) = Left (a,c)
@@ -108,8 +112,10 @@ instance Bimodule (Dist q) where
 
 instance Distributor (Dist q) where
   root = Root
-  branch f g (Root v) dist =
-    dimap (either (absurd . v) id . f) (g . Right) dist
+  -- 0+x = x
+  branch f g (Root v) x =
+    dimap (either (absurd . v) id . f) (g . Right) x
+  -- (x+y)+z = x+(y+z)
   branch f g (Branch f' g' x y) z =
     let
       associate (Left (Left a)) = Left a
