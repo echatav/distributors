@@ -15,6 +15,14 @@ to the case of a Hask-enriched endo-profunctor which respects
 the product structure of Hask given by pairing `(,)`.
 `Bimodule` and `Profunctor` relate in the same way as
 `Applicative` and `Functor`.
+
+I might guess that there's a Van Laarhoven representation
+of `Traversal`s using `Bimodule`.
+
+```
+type Traversal s t a b =
+  forall p. Bimodule p => p a b -> p s t
+```
 -}
 class Profunctor p => Bimodule p where
 
