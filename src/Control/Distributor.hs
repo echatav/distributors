@@ -65,10 +65,10 @@ instance Bimodule (Bimod q) where
   factor f g (Factor f' g' x y) z =
     let
       associate ((a,b),c) = (a,(b,c))
-      ff = first f' . f
+      ff = associate . first f' . f
       gg b0 (b1,b2) = g (g' b0 b1) b2
     in
-      Factor (associate . ff) gg x (y >*< z)
+      Factor ff gg x (y >*< z)
 
 data Dist q a b where
   Root :: (a -> Void) -> Dist q a b
@@ -120,12 +120,12 @@ instance Distributor (Dist q) where
     let
       associate (Left (Left a)) = Left a
       associate (Left (Right b)) = Right (Left b)
-      associate (Right  c) = Right (Right c)
+      associate (Right c) = Right (Right c)
 
-      ff = left f' . f
+      ff = associate . left f' . f
 
       gg (Left b0) = g (Left (g' (Left b0)))
       gg (Right (Left b1)) = g (Left (g' (Right b1)))
       gg (Right (Right b2)) = g (Right b2)
     in
-      Branch (associate . ff) gg x (y >|< z)
+      Branch ff gg x (y >|< z)
