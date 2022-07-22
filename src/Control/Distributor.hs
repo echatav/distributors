@@ -2,6 +2,7 @@
 GADTs
 , LambdaCase
 , QuantifiedConstraints
+, RankNTypes
 #-}
 
 module Control.Distributor where
@@ -14,6 +15,7 @@ class Profunctor p => Bimodule p where
 
   expel :: b -> p a b
   expel b = dimap (\_ -> ()) (\_ -> b) expelled
+
   expelled :: p () ()
   expelled = expel ()
 
@@ -24,13 +26,32 @@ class Profunctor p => Bimodule p where
     -> p a1 b1
     -> p a b
   factor f g p0 p1 = dimap f (uncurry g) (p0 >*< p1)
+
   (>*<) :: p a0 b0 -> p a1 b1 -> p (a0,a1) (b0,b1)
+  infixr 4 >*<
   (>*<) = factor id (,)
+
+(>*) :: Bimodule p => p () () -> p a b -> p a b
+infixr 4 >*
+p0 >* p1 = factor (\a -> ((),a)) (\_ b -> b) p0 p1
+
+(*<) :: Bimodule p => p a b -> p () () -> p a b
+infixr 4 *<
+p0 *< p1 = factor (\a -> (a,())) (\b _ -> b) p0 p1
+
+(>**<)
+  :: Bimodule p
+  => p a0 b0
+  -> p a1 b1
+  -> p (a0,(a1,())) (b0,(b1,()))
+infixr 4 >**<
+x >**< y = x >*< y >*< expelled
 
 class Bimodule p => Distributor p where
 
   root :: (a -> Void) -> p a b
   root f = dimap f absurd rooted
+
   rooted :: p Void Void
   rooted = root id
 
@@ -41,8 +62,26 @@ class Bimodule p => Distributor p where
     -> p a1 b1
     -> p a b
   branch f g p0 p1 = dimap f g (p0 >|< p1)
+
   (>|<) :: p a0 b0 -> p a1 b1 -> p (Either a0 a1) (Either b0 b1)
+  infixr 3 >|<
   (>|<) = branch id id
+
+(>|) :: Distributor p => p Void Void -> p a b -> p a b
+infixr 3 >|
+p0 >| p1 = branch Right (either absurd id) p0 p1
+
+(|<) :: Distributor p => p a b -> p Void Void -> p a b
+infixr 3 |<
+p0 |< p1 = branch Left (either id absurd) p0 p1
+
+(>||<)
+  :: Distributor p
+  => p a0 b0
+  -> p a1 b1
+  -> p (Either a0 (Either a1 Void)) (Either b0 (Either b1 Void))
+infixr 3 >||<
+x >||< y = x >|< y >|< rooted
 
 data Bimod q a b where
   Expel :: b -> Bimod q a b
@@ -52,21 +91,25 @@ data Bimod q a b where
     -> q a0 b0
     -> Bimod q a1 b1
     -> Bimod q a b
+
 instance Profunctor (Bimod q) where
   dimap f g = \case
     Expel b -> Expel (g b)
     Factor f' g' x y ->
       Factor (f' . f) (((.).(.)) g g') x y
+
 instance Bimodule (Bimod q) where
   expel = Expel
+
   -- 1*x = x
   factor f g (Expel b) x = dimap (snd . f) (g b) x
+
   -- (x*y)*z = x*(y*z)
   factor f g (Factor f' g' x y) z =
     let
       associate ((a,b),c) = (a,(b,c))
       ff = associate . first f' . f
-      gg b0 (b1,b2) = g (g' b0 b1) b2
+      gg a (b,c) = g (g' a b) c
     in
       Factor ff gg x (y >*< z)
 
@@ -89,8 +132,10 @@ instance Profunctor (Dist q) where
 
 instance Bimodule (Dist q) where
   expel b = liftBimod (Expel b)
+
   -- 0 * _ = 0
   factor f _ (Root v) _ = Root (v . fst . f)
+
   -- (x+y)*z = (x*z)+(y*z)
   factor f g (Branch f' g' x y) z =
     let
@@ -112,9 +157,11 @@ instance Bimodule (Dist q) where
 
 instance Distributor (Dist q) where
   root = Root
+
   -- 0+x = x
   branch f g (Root v) x =
     dimap (either (absurd . v) id . f) (g . Right) x
+
   -- (x+y)+z = x+(y+z)
   branch f g (Branch f' g' x y) z =
     let
@@ -124,8 +171,22 @@ instance Distributor (Dist q) where
 
       ff = associate . left f' . f
 
-      gg (Left b0) = g (Left (g' (Left b0)))
-      gg (Right (Left b1)) = g (Left (g' (Right b1)))
-      gg (Right (Right b2)) = g (Right b2)
+      gg (Left a) = g (Left (g' (Left a)))
+      gg (Right (Left b)) = g (Left (g' (Right b)))
+      gg (Right (Right c)) = g (Right c)
     in
       Branch ff gg x (y >|< z)
+
+several :: Distributor p => p a b -> p [a] [b]
+several p =
+  let
+    cons (Left ()) = []
+    cons (Right (x,xs)) = x:xs
+
+    decons [] = Left ()
+    decons (x:xs) = Right (x,xs)
+  in
+    branch decons cons expelled (several1 p)
+
+several1 :: Distributor p => p a b -> p (a,[a]) (b,[b])
+several1 p = p >*< several p
