@@ -32,20 +32,18 @@ class Profunctor p => Bimodule p where
   (>*<) = factor id (,)
 
 (>*) :: Bimodule p => p () () -> p a b -> p a b
-infixr 4 >*
-p0 >* p1 = factor (\a -> ((),a)) (\_ b -> b) p0 p1
+(>*) = factor (\a -> ((),a)) (\_ b -> b)
 
 (*<) :: Bimodule p => p a b -> p () () -> p a b
-infixr 4 *<
-p0 *< p1 = factor (\a -> (a,())) (\b _ -> b) p0 p1
+(*<) = factor (\a -> (a,())) (\b _ -> b)
 
-(>**<)
-  :: Bimodule p
-  => p a0 b0
-  -> p a1 b1
-  -> p (a0,(a1,())) (b0,(b1,()))
-infixr 4 >**<
-x >**< y = x >*< y >*< expelled
+instance Applicative f => Bimodule (Star f) where
+  expel b = Star (\_ -> pure b)
+  factor f g (Star s0) (Star s1) =
+    let
+      g01 (a0, a1) = g <$> s0 a0 <*> s1 a1
+    in
+      Star (g01 . f)
 
 class Bimodule p => Distributor p where
 
@@ -67,21 +65,14 @@ class Bimodule p => Distributor p where
   infixr 3 >|<
   (>|<) = branch id id
 
-(>|) :: Distributor p => p Void Void -> p a b -> p a b
-infixr 3 >|
-p0 >| p1 = branch Right (either absurd id) p0 p1
-
-(|<) :: Distributor p => p a b -> p Void Void -> p a b
-infixr 3 |<
-p0 |< p1 = branch Left (either id absurd) p0 p1
-
-(>||<)
-  :: Distributor p
-  => p a0 b0
-  -> p a1 b1
-  -> p (Either a0 (Either a1 Void)) (Either b0 (Either b1 Void))
-infixr 3 >||<
-x >||< y = x >|< y >|< rooted
+instance Applicative f => Distributor (Star f) where
+  root v = Star (vacuous . pure . v)
+  branch f g (Star s0) (Star s1) =
+    let
+      g01 (Left a0) = g . Left <$> s0 a0
+      g01 (Right a1) = g . Right <$> s1 a1
+    in
+      Star (g01 . f)
 
 data Bimod q a b where
   Expel :: b -> Bimod q a b
@@ -190,3 +181,17 @@ several p =
 
 several1 :: Distributor p => p a b -> p (a,[a]) (b,[b])
 several1 p = p >*< several p
+
+sepBy :: Distributor p => p () () -> p a b -> p [a] [b]
+sepBy separator p =
+  let
+    cons (Left ()) = []
+    cons (Right (x,xs)) = x:xs
+
+    decons [] = Left ()
+    decons (x:xs) = Right (x,xs)
+  in
+    branch decons cons expelled (sepBy1 separator p)
+
+sepBy1 :: Distributor p => p () () -> p a b -> p (a,[a]) (b,[b])
+sepBy1 separator p = p >*< several (separator >* p)
