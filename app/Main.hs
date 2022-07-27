@@ -1,7 +1,7 @@
 module Main where
 
 import Control.Distributor
-import Text.PP
+import Text.Distributor
 
 main :: IO ()
 main = putStrLn "Executable not yet implemented"

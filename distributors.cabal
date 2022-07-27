@@ -22,7 +22,7 @@ source-repository head
 library
   exposed-modules:
       Control.Distributor
-      Text.PP
+      Text.Distributor
   hs-source-dirs:
       src
   build-depends:

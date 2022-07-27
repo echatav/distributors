@@ -1,4 +1,4 @@
-module Text.PP where
+module Text.Distributor where
 
 import Control.Applicative
 import Control.Distributor
