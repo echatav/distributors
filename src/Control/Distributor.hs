@@ -11,6 +11,24 @@ import Control.Arrow
 import Data.Profunctor
 import Data.Void
 
+{- | A `Bimodule` is a `Profunctor` which respects
+the monoidal structure of the category of Haskell
+types and functions `(->)` given by
+the unit type `()` and the Cartesian product `(,)`.
+
+In the Category Theory literature, a bimodule is
+a profunctor over categories enriched in a
+monoidal category, generalizing the Algebra concept
+of bimodules over monoids.
+
+`(->)` is self-enriched with the monoidal structure given
+by `()` and `(,)`. Thus, all endoprofunctors on `(->)`
+are bimodules.
+
+But, only those which also respect
+that monoidal structure should be given instances
+of `Bimodule`.
+-}
 class Profunctor p => Bimodule p where
 
   expel :: b -> p a b
@@ -45,6 +63,23 @@ instance Applicative f => Bimodule (Star f) where
     in
       Star (g01 . f)
 
+{- | A category with finite products and coproducts is called
+distributive, if the canonical distributivity morphism
+is an isomorphism. A `Distributor` is a `Profunctor`
+which respects the distributive structure on `(->)`
+given by nullary product `()`, binary product `(,)`,
+nullary coproduct `Void` and binary coproduct `Either`.
+
+In the Category Theory literature, distributor is a
+synonym for profunctor. Jean Bénabou,
+who coined both terms and originally used profunctor
+later preferred distributor.
+
+Credit for the use of the term distributor in the
+case of a profunctor which respects distributive structure
+goes to Travis Squires in his thesis
+"Profunctors and Distributive Categories".
+-}
 class Bimodule p => Distributor p where
 
   root :: (a -> Void) -> p a b
@@ -74,6 +109,10 @@ instance Applicative f => Distributor (Star f) where
     in
       Star (g01 . f)
 
+{- |
+`Bimod` is an encoding of the free `Bimodule`
+generated over a quiver.
+-}
 data Bimod q a b where
   Expel :: b -> Bimod q a b
   Factor
@@ -104,6 +143,10 @@ instance Bimodule (Bimod q) where
     in
       Factor ff gg x (y >*< z)
 
+{- |
+`Dist` is an encoding of the free `Distributor`
+generated over a quiver.
+-}
 data Dist q a b where
   Root :: (a -> Void) -> Dist q a b
   Branch
