@@ -26,9 +26,8 @@ of bimodules over monoids.
 by `()` and `(,)`. Thus, all endoprofunctors on `(->)`
 are bimodules.
 
-But, only those which also respect
-that monoidal structure should be given instances
-of `Bimodule`.
+But here, only those which also respect
+that monoidal structure are instances of `Bimodule`.
 -}
 class Profunctor p => Bimodule p where
 
@@ -91,7 +90,7 @@ given by nullary product `()`, binary product `(,)`,
 nullary coproduct `Void` and binary coproduct `Either`.
 
 In the Category Theory literature, distributor is a
-synonym for profunctor. Jean Bénabou,
+synonym for profunctor; Jean Bénabou,
 who coined both terms and originally used profunctor
 later preferred distributor.
 
