@@ -7,8 +7,9 @@ GADTs
 
 module Control.Distributor where
 
-import Control.Arrow
+import Data.Bifunctor
 import Data.Profunctor
+import Data.Profunctor.Composition
 import Data.Void
 
 {- | A `Bimodule` is a `Profunctor` which respects
@@ -30,6 +31,13 @@ that monoidal structure should be given instances
 of `Bimodule`.
 -}
 class Profunctor p => Bimodule p where
+
+  {-# MINIMAL
+      expel, factor
+    | expel, (>*<)
+    | expelled, factor
+    | expelled, (>*<)
+    #-}
 
   expel :: b -> p a b
   expel b = dimap (\_ -> ()) (\_ -> b) expelled
@@ -55,6 +63,10 @@ class Profunctor p => Bimodule p where
 (*<) :: Bimodule p => p a b -> p () () -> p a b
 (*<) = factor (\a -> (a,())) (\b _ -> b)
 
+instance Bimodule (->) where
+  expelled = id
+  (>*<) = bimap
+
 instance Applicative f => Bimodule (Star f) where
   expel b = Star (\_ -> pure b)
   factor f g (Star s0) (Star s1) =
@@ -62,6 +74,12 @@ instance Applicative f => Bimodule (Star f) where
       g01 (a0, a1) = g <$> s0 a0 <*> s1 a1
     in
       Star (g01 . f)
+
+instance (Bimodule p, Bimodule q)
+  => Bimodule (Procompose p q) where
+    expelled = Procompose expelled expelled
+    Procompose bc0 ab0 >*< Procompose bc1 ab1 =
+      Procompose (bc0 >*< bc1) (ab0 >*< ab1)
 
 {- | A category with finite products and coproducts is called
 distributive, if the canonical distributivity morphism
@@ -82,6 +100,13 @@ goes to Travis Squires in his thesis
 -}
 class Bimodule p => Distributor p where
 
+  {-# MINIMAL
+      root, branch
+    | root, (>|<)
+    | rooted, branch
+    | rooted, (>|<)
+    #-}
+
   root :: (a -> Void) -> p a b
   root f = dimap f absurd rooted
 
@@ -99,6 +124,16 @@ class Bimodule p => Distributor p where
   (>|<) :: p a0 b0 -> p a1 b1 -> p (Either a0 a1) (Either b0 b1)
   infixr 3 >|<
   (>|<) = branch id id
+
+instance Distributor (->) where
+  rooted = id
+  (>|<) = bimap
+
+instance (Distributor p, Distributor q)
+  => Distributor (Procompose p q) where
+    rooted = Procompose rooted rooted
+    Procompose bc0 ab0 >|< Procompose bc1 ab1 =
+      Procompose (bc0 >|< bc1) (ab0 >|< ab1)
 
 instance Applicative f => Distributor (Star f) where
   root v = Star (vacuous . pure . v)
@@ -203,7 +238,7 @@ instance Distributor (Dist q) where
       associate (Left (Right b)) = Right (Left b)
       associate (Right c) = Right (Right c)
 
-      ff = associate . left f' . f
+      ff = associate . first f' . f
 
       gg (Left a) = g (Left (g' (Left a)))
       gg (Right (Left b)) = g (Left (g' (Right b)))
