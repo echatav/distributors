@@ -58,9 +58,11 @@ class Profunctor p => Bimodule p where
   (>*<) = factor id (,)
 
 (>*) :: Bimodule p => p () () -> p a b -> p a b
+infixr 4 >*
 (>*) = factor (\a -> ((),a)) (\_ b -> b)
 
 (*<) :: Bimodule p => p a b -> p () () -> p a b
+infixr 4 *<
 (*<) = factor (\a -> (a,())) (\b _ -> b)
 
 instance Bimodule (->) where
