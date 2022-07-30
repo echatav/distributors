@@ -1,12 +1,15 @@
 {-# LANGUAGE
-GADTs
+ConstraintKinds
+, GADTs
 , LambdaCase
 , QuantifiedConstraints
 , RankNTypes
+, TupleSections
 #-}
 
 module Control.Distributor where
 
+import Control.Applicative
 import Data.Bifunctor
 import Data.Profunctor
 import Data.Profunctor.Composition
@@ -274,3 +277,79 @@ sepBy separator p =
 
 sepBy1 :: Distributor p => p () () -> p a b -> p (a,[a]) (b,[b])
 sepBy1 separator p = p >*< several (separator >* p)
+
+
+{-
+On Structuring Functional Programs with Monoidal Profunctors
+-}
+newtype DiStar f g a b = DiStar {runDiStar :: f a -> g b}
+instance (Functor f, Functor g) => Profunctor (DiStar f g) where
+  dimap f g (DiStar fg) = DiStar (fmap g . fg . fmap f)
+instance (Functor f, Applicative g) => Bimodule (DiStar f g) where
+  expel b = DiStar (\_ -> pure b)
+  factor f g (DiStar fg0) (DiStar fg1) =
+    let
+      fg f' = (fg0 (fst <$> f'), fg1 (snd <$> f'))
+    in
+      DiStar (uncurry (liftA2 g) . fg . fmap f)
+
+type Traversor p = (Strong p, Choice p, Bimodule p)
+
+type TraversalP s t a b =
+  forall p. Traversor p => p a b -> p s t
+
+toTraversal :: Applicative f => TraversalP s t a b -> (a -> f b) -> s -> f t
+toTraversal vanLaar = runStar . vanLaar . Star
+
+-- https://arxiv.org/pdf/1703.10857.pdf
+
+-- stride :: (Traversor p, Traversable t) => p a b -> p (t a) (t b)
+-- stride p = dimap _ _ (right' (p >*< stride p))
+
+-- https://arxiv.org/pdf/2207.00852.pdf
+
+data FunList a b t = Done t | More a (FunList a b (b -> t))
+
+out :: FunList a b t -> Either t (a, FunList a b (b -> t))
+out (Done t) = Left t
+out (More x l) = Right (x, l)
+
+inn :: Either t (a, FunList a b (b -> t)) -> FunList a b t
+inn (Left t) = Done t
+inn (Right (x, l)) = More x l
+
+instance Functor (FunList a b) where
+  fmap f (Done t) = Done (f t)
+  fmap f (More x l) = More x (fmap (f .) l)
+
+instance Applicative (FunList a b) where
+  pure = Done
+  Done f <*> l' = fmap f l'
+  More x l <*> l' = More x (fmap flip l <*> l')
+
+single :: a -> FunList a b b
+single x = More x (Done id)
+
+fuse :: FunList b b t -> t
+fuse (Done t) = t
+fuse (More x l) = fuse l x
+
+stride :: Traversor p => p a b -> p (FunList a c t) (FunList b c t)
+stride k = dimap out inn (right' (k >*< stride k))
+
+newtype Traversal a b s t = Traversal
+  { runTraversal :: s -> FunList a b t }
+instance Profunctor (Traversal a b) where
+  dimap f g (Traversal h) = Traversal (fmap g . h . f)
+instance Strong (Traversal a b) where
+  first' (Traversal h) = Traversal (\(s,c) -> fmap (,c) (h s))
+  second' (Traversal h) = Traversal (\(c,s) -> fmap (c,) (h s))
+instance Choice (Traversal a b) where
+  left' (Traversal h) = Traversal (either (fmap Left . h) (Done . Right))
+  right' (Traversal h) = Traversal (either (Done . Left) (fmap Right . h))
+instance Bimodule (Traversal a b) where
+  expelled = Traversal pure
+  Traversal h >*< Traversal k = Traversal (\(x,y) -> (,) <$> h x <*> k y)
+
+traversalP2C :: TraversalP s t a b -> Traversal a b s t
+traversalP2C l = l (Traversal single)
