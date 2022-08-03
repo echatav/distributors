@@ -34,10 +34,12 @@ instance Distributor (PP s t) where
   branch f g pp0 pp1 = PP printer' parser'
     where
       printer' a = either (printer pp0) (printer pp1) (f a)
-      parser' t = do
-        (b0,t0) <- parser pp0 t
-        (b1,t1) <- parser pp1 t
-        [(g (Left b0), t0), (g (Right b1), t1)]
+      parser' t =
+        let
+          lhs = [(g (Left b0), t0) | (b0,t0) <- parser pp0 t]
+          rhs = [(g (Right b1), t1) | (b1,t1) <- parser pp1 t]
+        in
+          lhs ++ rhs
 
 end :: PP [c] [d] () ()
 end = PP (\_ -> Just) (bool [] [((),[])] . null)
@@ -47,7 +49,7 @@ token f g = PP printer' parser'
   where
     printer' a ts = case f a of
       Nothing -> Nothing
-      Just t -> Just (t:ts)
+      Just t -> Just (ts <> [t])
     parser' [] = []
     parser' (t:ts) = case g t of
       Nothing -> []
@@ -61,6 +63,9 @@ satisfy cond = token satiate satiate
 char :: Eq c => c -> PP [c] [c] c c
 char c = satisfy (== c)
 
+char_ :: Eq c => c -> PP [c] [c] () ()
+char_ c = dimap (\_ -> c) (\_ -> ()) (char c)
+
 anyChar :: PP [c] [c] c c
 anyChar = token Just Just
 
@@ -73,6 +78,9 @@ string cs =
       Just es -> [(cs,es)]
   in
     PP printer' parser'
+
+string_ :: Eq c => [c] -> PP [c] [c] () ()
+string_ cs = dimap (\_ -> cs) (\_ -> ()) (string cs)
 
 oneOf :: Eq c => [c] -> PP [c] [c] c c
 oneOf cs = satisfy (`elem` cs)
@@ -106,3 +114,23 @@ ascii = satisfy isAscii
 latin1 = satisfy isLatin1
 asciiUpper = satisfy isAsciiUpper
 asciiLower = satisfy isAsciiLower
+
+-- | CSV example
+--
+-- >>> let Just txt = printer csv [["foo","bar"],["oof","rab"]] ""
+-- >>> putStrLn txt
+-- "foo","bar"
+-- "oof","rab"
+--
+-- >>> parser csv txt
+-- [([["foo","bar"],["oof","rab"]],"")]
+csv :: PP String String [[String]] [[String]]
+csv =
+  let
+    quote = '\"'
+    newline = '\n'
+    comma = ','
+    cell = char_ quote >* several (satisfy (/= quote)) *< char_ quote
+    line = sepBy (char_ comma) cell *< char_ newline
+  in
+    several line *< end
