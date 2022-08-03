@@ -247,6 +247,14 @@ instance Distributor (Dist q) where
     in
       Branch ff gg x (y >|< z)
 
+mayhaps :: Distributor p => p a b -> p (Maybe a) (Maybe b)
+mayhaps =
+  let
+    hither = maybe (Left ()) Right
+    thither = either (\_ -> Nothing) Just
+  in
+    branch hither thither expelled
+
 several :: Distributor p => p a b -> p [a] [b]
 several p =
   let
