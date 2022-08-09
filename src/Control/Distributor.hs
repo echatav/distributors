@@ -179,6 +179,14 @@ instance Bimodule (Bimod q) where
     in
       Factor ff gg x (y >*< z)
 
+foldBimod
+  :: Bimodule p
+  => (forall a b. q a b -> p a b)
+  -> Bimod q a b -> p a b
+foldBimod k = \case
+  Expel b -> expel b
+  Factor f g x y -> factor f g (k x) (foldBimod k y)
+
 {- |
 `Dist` is an encoding of the free `Distributor`
 generated over a quiver.
@@ -282,3 +290,11 @@ sepBy separator p =
 
 sepBy1 :: Distributor p => p () () -> p a b -> p (a,[a]) (b,[b])
 sepBy1 separator p = p >*< several (separator >* p)
+
+foldDist
+  :: Distributor p
+  => (forall a b. q a b -> p a b)
+  -> Dist q a b -> p a b
+foldDist k = \case
+  Root v -> root v
+  Branch f g x y -> branch f g (foldBimod k x) (foldDist k y)
