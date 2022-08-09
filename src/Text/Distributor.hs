@@ -1,10 +1,19 @@
+{-# LANGUAGE
+GADTs
+, LambdaCase
+, RankNTypes
+#-}
+
 module Text.Distributor where
 
 import Control.Applicative
 import Control.Distributor
+import Control.Monad
+import Control.Monad.Fix
 import Data.Bifunctor
 import Data.Bool
 import Data.Char
+import Data.Functor.Identity
 import Data.List
 import Data.Profunctor
 
@@ -134,3 +143,61 @@ csv =
     line = sepBy (char_ comma) cell *< char_ newline
   in
     several line *< end
+
+data Grammar p a where
+  RuleBind :: Dist p a a -> (Dist p a a -> Grammar p b) -> Grammar p b
+  FixBind  :: (a -> Grammar p a) -> (a -> Grammar p b) -> Grammar p b
+  Return   :: a -> Grammar r a
+
+instance Functor (Grammar p) where
+  fmap f = \case
+    RuleBind ps h -> RuleBind ps (fmap f . h)
+    FixBind g h -> FixBind g (fmap f . h)
+    Return x -> Return (f x)
+
+instance Applicative (Grammar p) where
+  pure  = return
+  (<*>) = ap
+
+instance Monad (Grammar p) where
+  return = Return
+  RuleBind ps f >>= k = RuleBind ps (f >=> k)
+  FixBind f g >>= k = FixBind f (g >=> k)
+  Return x >>= k = k x
+
+instance MonadFix (Grammar p) where
+  mfix f = FixBind f return
+
+rule :: Dist p a a -> Grammar p (Dist p a a)
+rule ps = RuleBind ps return
+
+runGrammar
+  :: MonadFix m
+  => (forall p a. Dist p a a -> m (Dist p a a))
+  -> Grammar r b
+  -> m b
+runGrammar r = \case
+  RuleBind p k -> do
+    nt <- r p
+    runGrammar r $ k nt
+  Return a -> return a
+  FixBind f k -> do
+    a <- mfix $ runGrammar r <$> f
+    runGrammar r $ k a
+
+recursiveDescent
+  :: (forall r. Grammar r (Dist (Symbol r (Token String String)) a a))
+  -> PP String String a a
+recursiveDescent f = foldDist overToken (runIdentity (runGrammar Identity f))
+  where
+    overToken :: Symbol Impossible (Token String String) a b -> PP String String a b
+    overToken (Terminal (Token hither thither)) = token hither thither
+
+data Token s t a b where
+  Token :: (a -> Maybe c) -> (d -> Maybe b) -> Token [c] [d] a b
+
+data Symbol r p a b where
+  Terminal :: p a b -> Symbol r p a b
+  NonTerminal :: r a b -> Symbol r p a b
+
+data Impossible a b
