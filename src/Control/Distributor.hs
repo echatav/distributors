@@ -7,7 +7,10 @@ GADTs
 
 module Control.Distributor where
 
+import Control.Applicative
 import Data.Bifunctor
+import Data.Functor.Contravariant
+import Data.Functor.Contravariant.Divisible
 import Data.Profunctor
 import Data.Profunctor.Composition
 import Data.Void
@@ -282,3 +285,24 @@ sepBy separator p =
 
 sepBy1 :: Distributor p => p () () -> p a b -> p (a,[a]) (b,[b])
 sepBy1 separator p = p >*< several (separator >* p)
+
+data Split f g a b = Split
+  { print :: f a
+  , parse :: g b
+  }
+
+instance (Contravariant f, Functor g)
+  => Profunctor (Split f g) where
+    dimap f g (Split a b) = Split (f >$< a) (g <$> b)
+
+instance (Divisible f, Applicative g)
+  => Bimodule (Split f g) where
+    expel b = Split conquer (pure b)
+    factor f g (Split a0 b0) (Split a1 b1) =
+      Split (divide f a0 a1) (liftA2 g b0 b1)
+
+instance (Decidable f, Alternative g)
+  => Distributor (Split f g) where
+    root v = Split (lose v) empty
+    branch f g (Split a0 b0) (Split a1 b1) =
+      Split (choose f a0 a1) (g <$> (Left <$> b0 <|> Right <$> b1))
