@@ -6,8 +6,8 @@ Maintainer: eitan@morphism.tech
 Stability: experimental
 
 `Bimodule` and `Distributor` are subclasses of `Profunctor`
-that act as analogous to how `Applicative` and `Alternative`
-act as subclasses of `Functor`. 
+that act in analogy to how `Applicative` and `Alternative`
+act as subclasses of `Functor`.
 -}
 
 {-# LANGUAGE
