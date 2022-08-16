@@ -1,3 +1,15 @@
+{-|
+Module: Control.Distributor
+Description: Bimodule and Distributor algebraic combinators
+Copyright: (c) Eitan Chatav, 2022
+Maintainer: eitan@morphism.tech
+Stability: experimental
+
+`Bimodule` and `Distributor` are subclasses of `Profunctor`
+that act as analogous to how `Applicative` and `Alternative`
+act as subclasses of `Functor`. 
+-}
+
 {-# LANGUAGE
 GADTs
 , LambdaCase
@@ -17,17 +29,12 @@ the monoidal structure of the category of Haskell
 types and functions `(->)` given by
 the unit type `()` and the Cartesian product `(,)`.
 
-In the Category Theory literature, a bimodule is
-a profunctor over categories enriched in a
-monoidal category, generalizing the Algebra concept
-of bimodules over monoids.
+That is, a `Bimodule` is Cartesian monoidal endoprofunctor on `(->)`.
 
-`(->)` is self-enriched with the monoidal structure given
-by `()` and `(,)`. Thus, all endoprofunctors on `(->)`
-are bimodules.
-
-But here, only those which also respect
-that monoidal structure are instances of `Bimodule`.
+This is contrary to the definition of bimodule
+in the category theory literature, which is the
+same as a profunctor but in a setting of enriched
+category theory.
 -}
 class Profunctor p => Bimodule p where
 
@@ -89,7 +96,7 @@ which respects the distributive structure on `(->)`
 given by nullary product `()`, binary product `(,)`,
 nullary coproduct `Void` and binary coproduct `Either`.
 
-In the Category Theory literature, distributor is a
+In the category theory literature, distributor is a
 synonym for profunctor; Jean Bénabou,
 who coined both terms and originally used profunctor
 later preferred distributor.
