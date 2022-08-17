@@ -7,7 +7,8 @@ GADTs
 
 module Control.Distributor where
 
-import Control.Applicative
+import Control.Applicative hiding (WrappedArrow(..))
+import qualified Control.Arrow as Arrow
 import Data.Bifunctor
 import Data.Functor.Contravariant
 import Data.Functor.Contravariant.Divisible
@@ -85,6 +86,10 @@ instance (Bimodule p, Bimodule q)
     Procompose bc0 ab0 >*< Procompose bc1 ab1 =
       Procompose (bc0 >*< bc1) (ab0 >*< ab1)
 
+instance Arrow.Arrow p => Bimodule (WrappedArrow p) where
+  expel b = WrapArrow (Arrow.arr (const b))
+  WrapArrow x >*< WrapArrow y = WrapArrow (x Arrow.*** y)
+
 {- | A category with finite products and coproducts is called
 distributive, if the canonical distributivity morphism
 is an isomorphism. A `Distributor` is a `Profunctor`
@@ -147,6 +152,10 @@ instance Applicative f => Distributor (Star f) where
       g01 (Right a1) = g . Right <$> s1 a1
     in
       Star (g01 . f)
+
+instance Arrow.ArrowChoice p => Distributor (WrappedArrow p) where
+  root v = WrapArrow (Arrow.arr (absurd . v))
+  WrapArrow x >|< WrapArrow y = WrapArrow (x Arrow.+++ y)
 
 {- |
 `Bimod` is an encoding of the free `Bimodule`
