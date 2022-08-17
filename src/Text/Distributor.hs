@@ -1,3 +1,7 @@
+{-# LANGUAGE
+LambdaCase
+#-}
+
 module Text.Distributor where
 
 import Control.Applicative
@@ -134,3 +138,21 @@ csv =
     line = sepBy (char_ comma) cell *< char_ newline
   in
     several line *< end
+
+data Expr = EAdd Expr Expr
+          | EInt Int
+
+express :: Expr -> Either (Expr, Expr) String
+express = \case
+  EAdd x y -> Left (x,y)
+  EInt x -> Right (show x)
+
+reexpress :: Either (Expr, Expr) String -> Expr
+reexpress = \case
+  Left (x,y) -> EAdd x y
+  Right x -> EInt (read x)
+
+expr :: PP String String Expr Expr
+expr = dimap express reexpress $
+  expr >*< expr
+  >|< several digit
