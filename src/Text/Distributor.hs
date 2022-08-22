@@ -1,5 +1,8 @@
 {-# LANGUAGE
-LambdaCase
+FlexibleContexts
+, FlexibleInstances
+, LambdaCase
+, MultiParamTypeClasses
 #-}
 
 module Text.Distributor where
@@ -48,48 +51,48 @@ instance Distributor (PP s t) where
 end :: PP [c] [d] () ()
 end = PP (\_ -> Just) (bool [] [((),[])] . null)
 
-token :: (a -> Maybe c) -> (d -> Maybe b) -> PP [c] [d] a b
-token f g = PP printer' parser'
-  where
-    printer' a ts = case f a of
-      Nothing -> Nothing
-      Just t -> Just (ts <> [t])
-    parser' [] = []
-    parser' (t:ts) = case g t of
-      Nothing -> []
-      Just b -> [(b,ts)]
+class Tokenized s t p where
+  tokenized :: (a -> Maybe s) -> (t -> Maybe b) -> p a b
+instance Tokenized c d (PP [c] [d]) where
+  tokenized f g = PP printer' parser'
+    where
+      printer' a ts = case f a of
+        Nothing -> Nothing
+        Just t -> Just (ts <> [t])
+      parser' [] = []
+      parser' (t:ts) = case g t of
+        Nothing -> []
+        Just b -> [(b,ts)]
 
-satisfy :: (c -> Bool) -> PP [c] [c] c c 
-satisfy cond = token satiate satiate
+satisfy :: Tokenized a a p => (a -> Bool) -> p a a
+satisfy cond = tokenized satiate satiate
   where
     satiate t = bool Nothing (Just t) (cond t)
 
-char :: Eq c => c -> PP [c] [c] c c
-char c = satisfy (== c)
+anyToken :: Tokenized a b p => p a b
+anyToken = tokenized Just Just
 
-char_ :: Eq c => c -> PP [c] [c] () ()
-char_ c = dimap (\_ -> c) (\_ -> ()) (char c)
+notToken :: (Eq a, Tokenized a a p) => a -> p a a
+notToken c = satisfy (/= c)
 
-anyChar :: PP [c] [c] c c
-anyChar = token Just Just
+token :: (Eq a, Tokenized a a p) => a -> p a a
+token c = satisfy (== c)
 
-string :: Eq c => [c] -> PP [c] [c] [c] [c]
-string cs =
-  let
-    printer' ds es = bool Nothing (Just (cs ++ es)) (cs == ds)
-    parser' ds = case stripPrefix cs ds of
-      Nothing -> []
-      Just es -> [(cs,es)]
-  in
-    PP printer' parser'
+token_ :: (Eq a, Profunctor p, Tokenized a a p) => a -> p () ()
+token_ c = dimap (\_ -> c) (\_ -> ()) (token c)
 
-string_ :: Eq c => [c] -> PP [c] [c] () ()
-string_ cs = dimap (\_ -> cs) (\_ -> ()) (string cs)
+tokens :: (Eq a, Bimodule p, Tokenized a a p) => [a] -> p [a] [a]
+tokens as = dimap (\_ -> ()) (\_ -> as) (tokens_ as)
 
-oneOf :: Eq c => [c] -> PP [c] [c] c c
+tokens_ :: (Eq a, Bimodule p, Tokenized a a p) => [a] -> p () ()
+tokens_ = \case
+  [] -> expel ()
+  a:as -> token_ a >* tokens_ as
+
+oneOf :: (Eq a, Tokenized a a p) => [a] -> p a a
 oneOf cs = satisfy (`elem` cs)
 
-noneOf :: Eq c => [c] -> PP [c] [c] c c
+noneOf :: (Eq a, Tokenized a a p) => [a] -> p a a
 noneOf cs = satisfy (`notElem` cs)
 
 control, space
@@ -97,7 +100,7 @@ control, space
   , digit, octDigit, hexDigit
   , letter, mark, number, punctuation, symbol, separator
   , ascii, latin1, asciiUpper, asciiLower
-  :: PP String String Char Char
+  :: Tokenized Char Char p => p Char Char
 control = satisfy isControl
 space = satisfy isSpace
 lower = satisfy isLower
@@ -131,11 +134,12 @@ asciiLower = satisfy isAsciiLower
 csv :: PP String String [[String]] [[String]]
 csv =
   let
-    quote = '\"'
-    newline = '\n'
-    comma = ','
-    cell = char_ quote >* several (satisfy (/= quote)) *< char_ quote
-    line = sepBy (char_ comma) cell *< char_ newline
+    quote = token_ '\"'
+    notQuote = notToken '\"'
+    newline = token_ '\n'
+    comma = token_ ','
+    cell = quote >* several notQuote *< quote
+    line = sepBy comma cell *< newline
   in
     several line *< end
 
