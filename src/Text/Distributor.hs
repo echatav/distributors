@@ -64,13 +64,13 @@ instance Tokenized c d (PP [c] [d]) where
         Nothing -> []
         Just b -> [(b,ts)]
 
+anyToken :: Tokenized a b p => p a b
+anyToken = tokenized Just Just
+
 satisfy :: Tokenized a a p => (a -> Bool) -> p a a
 satisfy cond = tokenized satiate satiate
   where
     satiate t = bool Nothing (Just t) (cond t)
-
-anyToken :: Tokenized a b p => p a b
-anyToken = tokenized Just Just
 
 notToken :: (Eq a, Tokenized a a p) => a -> p a a
 notToken c = satisfy (/= c)
