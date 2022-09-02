@@ -303,26 +303,26 @@ sepBy separator p =
 sepBy1 :: Distributor p => p () () -> p a b -> p (a,[a]) (b,[b])
 sepBy1 separator p = p >*< several (separator >* p)
 
-data Split f g a b = Split
-  { print :: f a
-  , parse :: g b
+data Codec f g a b = Codec
+  { encode :: f a
+  , decode :: g b
   }
 
 instance (Contravariant f, Functor g)
-  => Profunctor (Split f g) where
-    dimap f g (Split a b) = Split (f >$< a) (g <$> b)
+  => Profunctor (Codec f g) where
+    dimap f g (Codec a b) = Codec (f >$< a) (g <$> b)
 
 instance (Divisible f, Applicative g)
-  => Bimodule (Split f g) where
-    expel b = Split conquer (pure b)
-    factor f g (Split a0 b0) (Split a1 b1) =
-      Split (divide f a0 a1) (liftA2 g b0 b1)
+  => Bimodule (Codec f g) where
+    expel b = Codec conquer (pure b)
+    factor f g (Codec a0 b0) (Codec a1 b1) =
+      Codec (divide f a0 a1) (liftA2 g b0 b1)
 
 instance (Decidable f, Alternative g)
-  => Distributor (Split f g) where
-    root v = Split (lose v) empty
-    branch f g (Split a0 b0) (Split a1 b1) =
-      Split (choose f a0 a1) (g <$> (Left <$> b0 <|> Right <$> b1))
+  => Distributor (Codec f g) where
+    root v = Codec (lose v) empty
+    branch f g (Codec a0 b0) (Codec a1 b1) =
+      Codec (choose f a0 a1) (g <$> (Left <$> b0 <|> Right <$> b1))
 
 foldDist
   :: Distributor p
