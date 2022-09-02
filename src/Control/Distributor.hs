@@ -304,8 +304,8 @@ sepBy1 :: Distributor p => p () () -> p a b -> p (a,[a]) (b,[b])
 sepBy1 separator p = p >*< several (separator >* p)
 
 data Codec f g a b = Codec
-  { encode :: f a
-  , decode :: g b
+  { encoder :: f a
+  , decoder :: g b
   }
 
 instance (Contravariant f, Functor g)
