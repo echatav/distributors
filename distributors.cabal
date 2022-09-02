@@ -22,6 +22,7 @@ source-repository head
 library
   exposed-modules:
       Control.Distributor
+      Control.Token
       Text.Distributor
   hs-source-dirs:
       src
