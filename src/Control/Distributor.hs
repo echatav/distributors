@@ -12,8 +12,10 @@ import qualified Control.Arrow as Arrow
 import Data.Bifunctor
 import Data.Functor.Contravariant
 import Data.Functor.Contravariant.Divisible
+import Data.Maybe
 import Data.Profunctor
 import Data.Profunctor.Composition
+import Data.Tagged
 import Data.Void
 
 {- | A `Bimodule` is a `Profunctor` which respects
@@ -278,13 +280,13 @@ mayhaps =
 several :: Distributor p => p a b -> p [a] [b]
 several p =
   let
-    cons (Left ()) = []
-    cons (Right (x,xs)) = x:xs
+    toList (Left ()) = []
+    toList (Right (x,xs)) = x:xs
 
-    decons [] = Left ()
-    decons (x:xs) = Right (x,xs)
+    fromList [] = Left ()
+    fromList (x:xs) = Right (x,xs)
   in
-    branch decons cons expelled (several1 p)
+    branch fromList toList expelled (p >*< several p)
 
 several1 :: Distributor p => p a b -> p (a,[a]) (b,[b])
 several1 p = p >*< several p
