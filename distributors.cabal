@@ -25,6 +25,7 @@ library
       Control.Grammar
       Control.Token
       Control.Token.Example
+      Control.PartialIso
       Data.Profunctor.Monoidal
       Data.Profunctor.Monoidal_
   hs-source-dirs:
